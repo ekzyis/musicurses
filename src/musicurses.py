@@ -18,6 +18,9 @@ class Mode(Enum):
 MUSICPATH = '/media/ekzyis/HDD/ekzyis/Musik'
 CURSES_ENTER_KEYS = [curses.KEY_ENTER, 10, 13]
 CURSES_TYPE_KEYS = [x for x in range(0,256)]
+# custom key code definitions
+curses.KEY_SDOWN = 336 # SHIFT-DOWN
+curses.KEY_SUP = 337 # SHIFT-UP
 
 #logging.basicConfig(filename='/home/ekzyis/musicurses.log', level=logging.DEBUG)
 
@@ -29,6 +32,7 @@ class Musicurses():
         self.__stdscr = stdscr
         self.__path = MUSICPATH
         self.__selection = Musicurses.MIN_SELECTION_INDEX
+        self.__selectionList = []
         self.__prompt = Musicurses.PROMPT
         self.__cursor = (0,2)
         self.__input = ''
@@ -68,7 +72,7 @@ class Musicurses():
         # Musicurses.MAX_SELECTION_INDEX +1 because we need length
         for (i,p) in enumerate(self.__proposals[0:Musicurses.MAX_SELECTION_INDEX+1]):
             style = curses.A_NORMAL
-            if(i == self.__selection): style = self.__style["SELECTION"]
+            if(i == self.__selection or i in self.__selectionList): style = self.__style["SELECTION"]
             else: style = self.__style[p.type()]
             stdscr.addstr(i+1, 0, p.name(), style)
         last = self.__commandInput if self.__commandInput else "-- {} --".format(self.__mode)
@@ -83,7 +87,7 @@ class Musicurses():
         # only change input if mode did not change during __handleMode
         if(prev_mode == self.__mode):
             self.__handleInput(c)
-        if(c == curses.KEY_DOWN or c == curses.KEY_UP):
+        if(c in [curses.KEY_DOWN, curses.KEY_UP, curses.KEY_SDOWN, curses.KEY_SUP]):
             self.__handleArrowNavigation(c)
         elif(c in CURSES_ENTER_KEYS):
             self.__handleEnterPress()
@@ -127,19 +131,36 @@ class Musicurses():
         self.__commandInput = commandInput
 
     def __handleArrowNavigation(self, c):
-        selection = self.__selection
         max_proposals_index = len(self.__proposals[0:Musicurses.MAX_SELECTION_INDEX+1])-1
-        if(c == curses.KEY_DOWN):
-            self.__selection = min(
-                min(Musicurses.MAX_SELECTION_INDEX, max_proposals_index),
-                selection+1)
-        elif(c == curses.KEY_UP):
-            self.__selection = max(Musicurses.MIN_SELECTION_INDEX, selection-1)
+        def __inner__getDownSelection(sel):
+            return min([Musicurses.MAX_SELECTION_INDEX, max_proposals_index, sel+1])
+        def __inner__getUpSelection(sel):
+            return max(Musicurses.MIN_SELECTION_INDEX, sel-1)
+        selection = self.__selection
+        selectionList = self.__selectionList
+        if(c in [curses.KEY_DOWN, curses.KEY_SDOWN]):
+            selection = __inner__getDownSelection(selection)
+            if(c == curses.KEY_DOWN):
+                selectionList = []
+            else:
+                selectionList.append(selection)
+        elif(c in [curses.KEY_UP, curses.KEY_SUP]):
+            selection = __inner__getUpSelection(selection)
+            if(c == curses.KEY_UP):
+                selectionList = []
+            else:
+                selectionList.append(selection)
         else:
-            raise ValueError("Given key code is neither KEY_DOWN nor KEY_UP!")
+            raise ValueError("Key code does not belong to an Arrow key!")
+        self.__selection = selection
+        self.__selectionList = selectionList
+
+    def __resetSelectionList(self):
+        self.__selectionList = []
 
     def __handleEnterPress(self):
         selection = self.__selection
+        selectionList = self.__selectionList
         proposals = self.__proposals
         input = self.__input
         commandInput = self.__commandInput
@@ -147,13 +168,20 @@ class Musicurses():
         if(mode == Mode.NORMAL):
             if(commandInput == ':q'):
                 exit(0)
-        if(0 <= selection <= Musicurses.MAX_SELECTION_INDEX):
-            selectedItem = proposals[selection]
-            if(selectedItem.type() == Filetype.DIRECTORY):
-                self.__changePath(selectedItem.path())
-            elif(selectedItem.type() in [Filetype.AUDIO,Filetype.PLAYLIST]):
-                # let's play some music, will we?
-                self.__play(selectedItem.path())
+        if(0 <= selection <= Musicurses.MAX_SELECTION_INDEX or len(selectionList) > 1):
+            if(len(selectionList) > 1):
+                # we selected a list of proposals!
+                for s in selectionList:
+                    p = proposals[s]
+                    if(p.type() in [Filetype.AUDIO,Filetype.PLAYLIST]):
+                        self.__play(p.path())
+            else:
+                selectedItem = proposals[selection]
+                if(selectedItem.type() == Filetype.DIRECTORY):
+                    self.__changePath(selectedItem.path())
+                elif(selectedItem.type() in [Filetype.AUDIO,Filetype.PLAYLIST]):
+                    # let's play some music, will we?
+                    self.__play(selectedItem.path())
         elif(selection == Musicurses.MIN_SELECTION_INDEX):
             if(mode == Mode.INSERT):
                 if(input == '..'):
@@ -163,6 +191,7 @@ class Musicurses():
         self.__path = os.path.abspath(path)
         self.__input = ''
         self.__selection = Musicurses.MIN_SELECTION_INDEX
+        self.__selectionList = []
 
     def __play(self, path):
         FNULL = open(os.devnull, 'w')
