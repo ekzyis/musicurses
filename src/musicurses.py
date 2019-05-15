@@ -143,12 +143,16 @@ class Musicurses():
             if(c == curses.KEY_DOWN):
                 selectionList = []
             else:
+                # add previous element if list was empty
+                if(not selectionList): selectionList.append(selection-1)
                 selectionList.append(selection)
         elif(c in [curses.KEY_UP, curses.KEY_SUP]):
             selection = __inner__getUpSelection(selection)
             if(c == curses.KEY_UP):
                 selectionList = []
             else:
+                # add previous element if list was empty
+                if(not selectionList): selectionList.append(selection+1)
                 selectionList.append(selection)
         else:
             raise ValueError("Key code does not belong to an Arrow key!")
