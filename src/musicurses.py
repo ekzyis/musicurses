@@ -166,6 +166,8 @@ class Musicurses():
                 selectionList.append(selection)
         else:
             raise ValueError("Key code does not belong to an Arrow key!")
+        # make sure that no index is higher than allowed
+        selectionList = list(filter(lambda i: i <= max_proposals_index, selectionList))
         self.__selection = selection
         self.__selectionList = selectionList
 
