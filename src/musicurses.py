@@ -133,7 +133,7 @@ class Musicurses():
     def __handleArrowNavigation(self, c):
         max_proposals_index = len(self.__proposals[0:Musicurses.MAX_SELECTION_INDEX+1])-1
         def __inner__getDownSelection(sel):
-            return min([Musicurses.MAX_SELECTION_INDEX, max_proposals_index, sel+1])
+            return min(max_proposals_index, sel+1)
         def __inner__getUpSelection(sel):
             return max(Musicurses.MIN_SELECTION_INDEX, sel-1)
         selection = self.__selection
@@ -221,7 +221,6 @@ class Musicurses():
             self.__selection = len(self.__proposals)-1
 
     def __updatePrompt(self):
-        prompt = self.__prompt
         prompt = "{}{}".format(self.__path.replace(MUSICPATH, ''), Musicurses.PROMPT)
         if(prompt[0] == '/'): prompt = prompt[1:]
         self.__prompt = prompt
